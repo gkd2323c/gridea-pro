@@ -18,6 +18,10 @@ export function OpenImageDialog() {
   return window['go']['app']['App']['OpenImageDialog']();
 }
 
+export function ShowPreferences() {
+  return window['go']['app']['App']['ShowPreferences']();
+}
+
 export function ShowToast(arg1, arg2) {
   return window['go']['app']['App']['ShowToast'](arg1, arg2);
 }

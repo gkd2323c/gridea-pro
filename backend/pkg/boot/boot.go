@@ -28,7 +28,7 @@ var appCtx context.Context
 
 // 菜单重建所需的包级引用
 var (
-	menuPrefsWindow  *app.PreferencesWindow
+	menuApplication  *app.App
 	menuAboutHandler func(*menu.CallbackData)
 	menuQuitHandler  func(*menu.CallbackData)
 	menuAppDir       string
@@ -165,7 +165,6 @@ func Run(assets embed.FS) {
 	services := facade.NewAppServices(appDir, assets)
 
 	application := app.NewApp(appDir, services)
-	prefsWindow := app.NewPreferencesWindow()
 
 	// Capture context for safe shutdown
 	quitHandler := func(_ *menu.CallbackData) {
@@ -188,13 +187,13 @@ func Run(assets embed.FS) {
 	}
 
 	// 保存菜单构建参数，用于运行时重建
-	menuPrefsWindow = prefsWindow
+	menuApplication = application
 	menuAboutHandler = aboutHandler
 	menuQuitHandler = quitHandler
 	menuAppDir = appDir
 
 	// 构建应用菜单（传递 appDir 以支持文件/目录操作）
-	appMenu := buildMenu(prefsWindow, aboutHandler, quitHandler, appDir)
+	appMenu := buildMenu(application, aboutHandler, quitHandler, appDir)
 
 	// Create application with options
 	err = wails.Run(&options.App{
@@ -209,7 +208,6 @@ func Run(assets embed.FS) {
 		StartHidden:      true,
 		OnStartup: func(ctx context.Context) {
 			appCtx = ctx // Capture context
-			prefsWindow.SetContext(ctx)
 			application.Startup(ctx)
 			services.Startup(ctx)
 
@@ -218,7 +216,7 @@ func Run(assets embed.FS) {
 				if len(optionalData) > 0 {
 					if locale, ok := optionalData[0].(string); ok {
 						SetLocale(locale)
-						newMenu := buildMenu(menuPrefsWindow, menuAboutHandler, menuQuitHandler, menuAppDir)
+						newMenu := buildMenu(menuApplication, menuAboutHandler, menuQuitHandler, menuAppDir)
 						wailsRuntime.MenuSetApplicationMenu(ctx, newMenu)
 						wailsRuntime.MenuUpdateApplicationMenu(ctx)
 					}
@@ -262,7 +260,7 @@ func emitEvent(event string, data ...interface{}) {
 
 // buildMenu creates the full application menu.
 func buildMenu(
-	prefsWindow *app.PreferencesWindow,
+	application *app.App,
 	aboutHandler func(*menu.CallbackData),
 	quitHandler func(*menu.CallbackData),
 	appDir string,
@@ -278,13 +276,12 @@ func buildMenu(
 		appSubMenu.AddText(T("app.about"), nil, aboutHandler)
 		appSubMenu.AddSeparator()
 
+		appSubMenu.AddText(T("app.preferences"), keys.CmdOrCtrl(","), func(_ *menu.CallbackData) {
+			application.ShowPreferences()
+		})
+
 		appSubMenu.AddText(T("app.checkUpdate"), nil, func(_ *menu.CallbackData) {
 			emitEvent("menu:check-update")
-		})
-		appSubMenu.AddSeparator()
-
-		appSubMenu.AddText(T("app.preferences"), keys.CmdOrCtrl(","), func(_ *menu.CallbackData) {
-			prefsWindow.Show()
 		})
 		appSubMenu.AddSeparator()
 
@@ -340,7 +337,7 @@ func buildMenu(
 	if runtime.GOOS != "darwin" {
 		fileMenu.AddSeparator()
 		fileMenu.AddText(T("app.preferences"), keys.CmdOrCtrl(","), func(_ *menu.CallbackData) {
-			prefsWindow.Show()
+			application.ShowPreferences()
 		})
 		fileMenu.AddSeparator()
 		fileMenu.AddText(T("app.quit"), keys.CmdOrCtrl("q"), quitHandler)
@@ -525,13 +522,20 @@ func buildMenu(
 	helpMenu.AddSeparator()
 
 	helpMenu.AddText(T("help.viewLogs"), nil, func(_ *menu.CallbackData) {
-		// 日志文件通常在用户配置目录
-		logDir := filepath.Join(appDir, "logs")
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return
+		}
+		logDir := filepath.Join(home, ".gridea pro")
 		if _, err := os.Stat(logDir); os.IsNotExist(err) {
-			// Fallback: 打开站点目录
-			openInOS(appDir)
-		} else {
+			_ = os.MkdirAll(logDir, 0755)
+		}
+		// 再次检查，确保目录存在（或已被创建）
+		if _, err := os.Stat(logDir); err == nil {
 			openInOS(logDir)
+		} else {
+			// Fallback: 如果创建失败，打开 appDir
+			openInOS(appDir)
 		}
 	})
 

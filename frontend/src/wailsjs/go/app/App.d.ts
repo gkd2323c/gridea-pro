@@ -10,6 +10,8 @@ export function OpenFolderDialog():Promise<Array<string>>;
 
 export function OpenImageDialog():Promise<string>;
 
+export function ShowPreferences():Promise<void>;
+
 export function ShowToast(arg1:string,arg2:string):Promise<void>;
 
 export function Startup(arg1:context.Context):Promise<void>;
