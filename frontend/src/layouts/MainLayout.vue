@@ -170,6 +170,7 @@ import { useSiteStore } from '@/stores/site'
 import AppSystem from '@/views/preferences/index.vue'
 import { Button } from '@/components/ui/button'
 import { EventsEmit, EventsOn, BrowserOpenURL } from '@/wailsjs/runtime'
+import { DeployToGit } from '@/wailsjs/go/facade/DeployFacade'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import {
   DocumentTextIcon,
@@ -277,9 +278,28 @@ const preview = () => {
   EventsEmit('preview-site')
 }
 
-const publish = () => {
+const publish = async () => {
+  if (publishLoading.value) return
   publishLoading.value = true
-  EventsEmit('publish-site')
+
+  try {
+    await DeployToGit()
+    EventsEmit('app:toast', {
+      message: t('dashboard.syncSuccess'),
+      type: 'success',
+      duration: 3000,
+    })
+  } catch (error: any) {
+    console.error('Deploy error:', error)
+    syncErrorModalVisible.value = true
+    log.value = {
+      type: 'Deploy Error',
+      message: error.message || String(error)
+    }
+    logModalVisible.value = true
+  } finally {
+    publishLoading.value = false
+  }
 }
 
 const goWeb = () => {
@@ -389,6 +409,11 @@ onMounted(() => {
   // 检查更新
   EventsOn('menu:check-update', () => {
     checkUpdate()
+  })
+
+  // 原生菜单调用部署
+  EventsOn('publish-site', () => {
+    publish()
   })
 
   // Initial site load request

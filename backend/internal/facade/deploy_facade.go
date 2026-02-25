@@ -19,5 +19,5 @@ func (f *DeployFacade) DeployToGit() error {
 	if ctx == nil {
 		ctx = context.TODO()
 	}
-	return f.internal.DeployToGit(ctx)
+	return f.internal.DeployToRemote(ctx)
 }

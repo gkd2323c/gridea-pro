@@ -367,7 +367,7 @@ cd /Volumes/Work/VibeCoding/Gridea\ Pro
 go build -o gridea-mcp ./backend/cmd/mcp
 
 # 方式二：go install（发布后）
-go install github.com/Tespera/gridea-pro/backend/cmd/mcp@latest
+go install github.com/username/gridea-pro/backend/cmd/mcp@latest
 ```
 
 ### 7.2 配置（Claude Desktop）

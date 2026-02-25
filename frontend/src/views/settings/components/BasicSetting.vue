@@ -11,7 +11,7 @@
               <SelectValue :placeholder="t('settings.network.platform')" /> <!-- // TODO: Check i18n key -->
             </SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="p in ['github', 'netlify', 'coding', 'gitee', 'sftp']" :key="String(p)"
+              <SelectItem v-for="p in ['github', 'netlify', 'vercel', 'coding', 'gitee', 'sftp']" :key="String(p)"
                 :value="String(p)">
                 {{ getPlatformLabel(p) }}
               </SelectItem>
@@ -65,11 +65,32 @@
         </div>
       </template>
 
+      <!-- Vercel -->
+      <template v-if="form.platform === 'vercel'">
+        <div class="grid grid-cols-[180px_1fr] items-center gap-4">
+          <label class="text-sm font-medium text-right text-muted-foreground">Project Name</label>
+          <div class="max-w-sm">
+            <Input v-model="form.repository" placeholder="my-vercel-project" class="" />
+            <div class="text-xs text-muted-foreground mt-1.5">Vercel 上的项目名称</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-[180px_1fr] items-center gap-4">
+          <label class="text-sm font-medium text-right text-muted-foreground">Access Token</label>
+          <div class="relative max-w-sm">
+            <Input v-model="form.token" :type="passVisible ? 'text' : 'password'" class="pr-8" />
+            <component :is="passVisible ? EyeIcon : EyeSlashIcon"
+              class="absolute right-2.5 top-3 w-4 h-4 cursor-pointer text-muted-foreground/70 hover:text-foreground transition-colors"
+              @click="passVisible = !passVisible" />
+            <div class="text-xs text-muted-foreground mt-1.5">从 Account Settings -> Tokens 生成</div>
+          </div>
+        </div>
+      </template>
+
       <!-- Git Platforms -->
       <template v-if="['github', 'coding', 'gitee'].includes(form.platform)">
         <div class="grid grid-cols-[180px_1fr] items-center gap-4">
           <label class="text-sm font-medium text-right text-muted-foreground">{{ t('settings.network.repository')
-            }}</label>
+          }}</label>
           <div class="max-w-sm">
             <Input v-model="form.repository" class="" />
           </div>
@@ -82,7 +103,7 @@
         </div>
         <div class="grid grid-cols-[180px_1fr] items-center gap-4">
           <label class="text-sm font-medium text-right text-muted-foreground">{{ t('settings.network.username')
-            }}</label>
+          }}</label>
           <div class="max-w-sm">
             <Input v-model="form.username" class="" />
           </div>
@@ -95,7 +116,7 @@
         </div>
         <div class="grid grid-cols-[180px_1fr] items-center gap-4" v-if="form.platform === 'coding'">
           <label class="text-sm font-medium text-right text-muted-foreground">{{ t('settings.network.tokenUsername')
-            }}</label>
+          }}</label>
           <div class="max-w-sm">
             <Input v-model="form.tokenUsername" class="" />
           </div>
@@ -196,14 +217,14 @@
         <template v-if="form.enabledProxy === 'proxy'">
           <div class="grid grid-cols-[180px_1fr] items-center gap-4">
             <label class="text-sm font-medium text-right text-muted-foreground">{{ t('settings.network.proxyAddress')
-              }}</label>
+            }}</label>
             <div class="max-w-sm">
               <Input v-model="form.proxyPath" class="" />
             </div>
           </div>
           <div class="grid grid-cols-[180px_1fr] items-center gap-4">
             <label class="text-sm font-medium text-right text-muted-foreground">{{ t('settings.network.proxyPort')
-              }}</label>
+            }}</label>
             <div class="max-w-sm">
               <Input v-model="form.proxyPort" class="" />
             </div>
@@ -284,6 +305,7 @@ const getPlatformLabel = (p: string) => {
   const labels: Record<string, string> = {
     github: 'Github Pages',
     netlify: 'Netlify',
+    vercel: 'Vercel',
     coding: 'Coding Pages',
     gitee: 'Gitee Pages',
     sftp: 'SFTP'
@@ -310,7 +332,11 @@ const canSubmit = computed(() => {
     && form.netlifyAccessToken
     && form.netlifySiteId
 
-  return pagesPlatfomValid || sftpPlatformValid || netlifyPlatformValid
+  const vercelPlatformValid = ['vercel'].includes(form.platform)
+    && form.repository
+    && form.token
+
+  return pagesPlatfomValid || sftpPlatformValid || netlifyPlatformValid || vercelPlatformValid
 })
 
 onMounted(() => {

@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"gridea-pro/backend/internal/domain"
+	"gridea-pro/backend/internal/service/deployer"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -11,6 +14,7 @@ import (
 
 type DeployService struct {
 	settingRepo domain.SettingRepository
+	renderer    *RendererService // Injected to trigger site build before deploy
 	appDir      string
 	mu          sync.Mutex
 	isDeploying bool
@@ -23,7 +27,12 @@ func NewDeployService(settingRepo domain.SettingRepository, appDir string) *Depl
 	}
 }
 
-func (s *DeployService) DeployToGit(ctx context.Context) error {
+// SetRenderer injects the RendererService into DeployService
+func (s *DeployService) SetRenderer(renderer *RendererService) {
+	s.renderer = renderer
+}
+
+func (s *DeployService) DeployToRemote(ctx context.Context) error {
 	s.mu.Lock()
 	if s.isDeploying {
 		s.mu.Unlock()
@@ -50,14 +59,44 @@ func (s *DeployService) DeployToGit(ctx context.Context) error {
 
 	s.log(ctx, fmt.Sprintf("Deploying to domain: %s", setting.Domain))
 
-	// Mock deployment logic
-	// In real implementation:
-	// 1. Build Static Site
-	// 2. Commit & Push to Remote Repo
-	s.log(ctx, "Executing git commands (Simulation)...")
+	// 2. Render Site
+	if s.renderer != nil {
+		s.log(ctx, "Building static site...")
+		if err := s.renderer.RenderAll(ctx); err != nil {
+			s.log(ctx, fmt.Sprintf("Failed to build site: %v", err))
+			return fmt.Errorf("render site failed: %w", err)
+		}
+	} else {
+		s.log(ctx, "Warning: Renderer service not attached, skipping build.")
+	}
 
-	// Simulate work if needed, or just return success
-	s.log(ctx, "Deployment successful!")
+	// 3. Prepare Git Repository Path
+	outputDir := filepath.Join(s.appDir, "output")
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+		_ = os.MkdirAll(outputDir, 0755) // Ensure it exists before Git operations if not already
+	}
+
+	// 4. Instantiate strategy based on platform
+	var provider deployer.Provider
+	switch setting.Platform {
+	case "github", "gitee":
+		provider = deployer.NewGitProvider()
+	case "vercel":
+		provider = deployer.NewVercelProvider()
+	default:
+		// Fallback or handle appropriately
+		provider = deployer.NewGitProvider()
+	}
+
+	// 5. Wrap log function
+	logger := func(msg string) {
+		s.log(ctx, msg)
+	}
+
+	// 6. Execute deployment (without buildSite callback)
+	if err := provider.Deploy(ctx, outputDir, &setting, logger); err != nil {
+		return err
+	}
 
 	return nil
 }

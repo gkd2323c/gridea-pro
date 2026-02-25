@@ -354,39 +354,44 @@ func buildMenu(
 	// ─────────────────────────────────────────────
 	// 3. 编辑 (Edit)
 	// ─────────────────────────────────────────────
-	// 手动构建编辑菜单（含标准操作 + 自定义功能）
-	editMenu := appMenu.AddSubmenu(T("edit"))
-
-	editMenu.AddText(T("edit.undo"), keys.CmdOrCtrl("z"), nil)
 	if runtime.GOOS == "darwin" {
-		editMenu.AddText(T("edit.redo"), keys.Combo("z", keys.CmdOrCtrlKey, keys.ShiftKey), nil)
+		// macOS: Append the native Edit menu so Cut/Copy/Paste work natively in WKWebView without execCommand prompts.
+		appMenu.Append(menu.EditMenu())
 	} else {
-		editMenu.AddText(T("edit.redo"), keys.CmdOrCtrl("y"), nil)
+		// Windows/Linux: WebView2/WebKit2GTK natively handles Ctrl+C/V.
+		// We only define custom editor actions here to avoid swallowing native shortcuts.
+		editMenu := appMenu.AddSubmenu(T("edit"))
+		editMenu.AddText(T("edit.find"), keys.CmdOrCtrl("f"), func(_ *menu.CallbackData) {
+			emitEvent("menu:find")
+		})
+		editMenu.AddText(T("edit.replace"), keys.Combo("f", keys.CmdOrCtrlKey, keys.OptionOrAltKey), func(_ *menu.CallbackData) {
+			emitEvent("menu:replace")
+		})
+		editMenu.AddSeparator()
+		editMenu.AddText(T("edit.copyHTML"), nil, func(_ *menu.CallbackData) {
+			emitEvent("menu:copy-html")
+		})
 	}
-	editMenu.AddSeparator()
-
-	editMenu.AddText(T("edit.cut"), keys.CmdOrCtrl("x"), nil)
-	editMenu.AddText(T("edit.copy"), keys.CmdOrCtrl("c"), nil)
-	editMenu.AddText(T("edit.paste"), keys.CmdOrCtrl("v"), nil)
-	editMenu.AddText(T("edit.selectAll"), keys.CmdOrCtrl("a"), nil)
-	editMenu.AddSeparator()
-
-	editMenu.AddText(T("edit.find"), keys.CmdOrCtrl("f"), func(_ *menu.CallbackData) {
-		emitEvent("menu:find")
-	})
-	editMenu.AddText(T("edit.replace"), keys.Combo("f", keys.CmdOrCtrlKey, keys.OptionOrAltKey), func(_ *menu.CallbackData) {
-		emitEvent("menu:replace")
-	})
-	editMenu.AddSeparator()
-
-	editMenu.AddText(T("edit.copyHTML"), nil, func(_ *menu.CallbackData) {
-		emitEvent("menu:copy-html")
-	})
 
 	// ─────────────────────────────────────────────
 	// 4. 视图 (View)
 	// ─────────────────────────────────────────────
 	viewMenu := appMenu.AddSubmenu(T("view"))
+
+	if runtime.GOOS == "darwin" {
+		// macOS:由于无法安全追加到原生 Edit 菜单中，将搜索等功能放入视图菜单顶部
+		viewMenu.AddText(T("edit.find"), keys.CmdOrCtrl("f"), func(_ *menu.CallbackData) {
+			emitEvent("menu:find")
+		})
+		viewMenu.AddText(T("edit.replace"), keys.Combo("f", keys.CmdOrCtrlKey, keys.OptionOrAltKey), func(_ *menu.CallbackData) {
+			emitEvent("menu:replace")
+		})
+		viewMenu.AddSeparator()
+		viewMenu.AddText(T("edit.copyHTML"), nil, func(_ *menu.CallbackData) {
+			emitEvent("menu:copy-html")
+		})
+		viewMenu.AddSeparator()
+	}
 
 	viewMenu.AddText(T("view.toggleSidebar"), keys.CmdOrCtrl("b"), func(_ *menu.CallbackData) {
 		emitEvent("menu:toggle-sidebar")
