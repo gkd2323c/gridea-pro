@@ -37,6 +37,8 @@ func (f *RendererFactory) CreateRenderer() (ThemeRenderer, error) {
 		return NewGoTemplateRenderer(f.config), nil
 	case "ejs":
 		return NewEjsRenderer(f.config), nil
+	case "jinja2":
+		return NewJinja2Renderer(f.config), nil
 	default:
 		return nil, fmt.Errorf("不支持的引擎类型: %s", engineType)
 	}
@@ -83,6 +85,9 @@ func (f *RendererFactory) readEngineFromConfig(configPath string) string {
 	if engine == "ejs" {
 		return "ejs"
 	}
+	if engine == "jinja2" || engine == "jinja" || engine == "j2" {
+		return "jinja2"
+	}
 
 	return ""
 }
@@ -93,6 +98,13 @@ func (f *RendererFactory) detectEngineByExtension(templatesDir string) (string, 
 	ejsFiles, _ := filepath.Glob(filepath.Join(templatesDir, "*.ejs"))
 	if len(ejsFiles) > 0 {
 		return "ejs", nil
+	}
+
+	// 检查是否存在 .jinja2 或 .j2 文件
+	jinja2Files, _ := filepath.Glob(filepath.Join(templatesDir, "*.jinja2"))
+	j2Files, _ := filepath.Glob(filepath.Join(templatesDir, "*.j2"))
+	if len(jinja2Files) > 0 || len(j2Files) > 0 {
+		return "jinja2", nil
 	}
 
 	// 检查是否存在 .html 或 .gohtml 文件

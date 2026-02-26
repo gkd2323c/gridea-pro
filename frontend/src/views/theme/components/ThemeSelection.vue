@@ -1,4 +1,5 @@
 <template>
+
   <div class="pb-20 max-w-6xl mx-auto pt-4 px-4 w-full">
     <div class="space-y-8">
       <!-- Current Theme -->
@@ -191,6 +192,8 @@ import { useImageUrl } from '@/composables/useImageUrl'
 import { Button } from '@/components/ui/button'
 import { toast } from 'vue-sonner'
 import { EventsEmit, EventsOnce, BrowserOpenURL } from '@/wailsjs/runtime'
+import { SaveThemeConfigFromFrontend } from '@/wailsjs/go/facade/ThemeFacade'
+import { domain } from '@/wailsjs/go/models'
 import { EyeIcon, UserIcon, PhotoIcon, AdjustmentsHorizontalIcon, ArrowTopRightOnSquareIcon } from '@heroicons/vue/24/outline'
 
 const emit = defineEmits(['change-tab'])
@@ -239,19 +242,20 @@ const previewTheme = (theme: any) => {
   }
 }
 
-const useTheme = (theme: any) => {
-  const form = { ...siteStore.site.themeConfig, themeName: theme.folder }
-
-  // Reuse save logic from BasicSetting (simplified)
-  EventsOnce('theme-saved', (result: boolean) => {
-    if (result) {
-      toast.success(t('settings.theme.configSaved'))
-      EventsEmit('app-site-reload')
-    } else {
-      toast.error('Theme save failed')
-    }
+const useTheme = async (theme: any) => {
+  // Use domain.ThemeConfig to satisfy type requirements
+  const form = new domain.ThemeConfig({
+    ...siteStore.site.themeConfig,
+    themeName: theme.folder
   })
 
-  EventsEmit('theme-save', form)
+  try {
+    await SaveThemeConfigFromFrontend(form)
+    toast.success(t('settings.theme.configSaved'))
+    EventsEmit('app-site-reload')
+  } catch (e) {
+    console.error(e)
+    toast.error('Theme save failed')
+  }
 }
 </script>

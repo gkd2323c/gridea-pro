@@ -33,6 +33,7 @@ func (s *RendererService) renderIndex(buildDir string, data *template.TemplateDa
 	// 使用新的渲染器接口
 	html, err := s.renderer.Render("index", data)
 	if err != nil {
+		os.WriteFile("/tmp/gridea_render_error.log", []byte(fmt.Sprintf("❌ 渲染失败: %v", err)), 0644)
 		_, _ = fmt.Fprintf(os.Stderr, "❌ 渲染失败: %v，使用简单模板\n", err)
 		return s.renderSimpleIndex(buildDir, data)
 	}

@@ -4,6 +4,7 @@ go 1.25.5
 
 require (
 	github.com/dop251/goja v0.0.0-20260106131823-651366fbe6e3
+	github.com/flosch/pongo2/v6 v6.0.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-git/go-git/v5 v5.16.5
 	github.com/gosimple/slug v1.15.0

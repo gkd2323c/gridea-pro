@@ -12,7 +12,7 @@ type ThemeRenderer interface {
 	Render(templateName string, data *template.TemplateData) (string, error)
 
 	// GetEngineType 获取引擎类型
-	// 返回: "gotemplate" 或 "ejs"
+	// 返回: "gotemplate" 或 "ejs" 或 "jinja2"
 	GetEngineType() string
 
 	// ClearCache 清除模板缓存
