@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"gridea-pro/backend/internal/domain"
 	"gridea-pro/backend/internal/render"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type RendererService struct {
@@ -34,6 +37,7 @@ type RendererService struct {
 	// 主题渲染器(新架构)
 	renderer     render.ThemeRenderer
 	currentTheme string
+	logger       *slog.Logger
 }
 
 func NewRendererService(
@@ -50,6 +54,7 @@ func NewRendererService(
 		appDir:             appDir,
 		themeConfigService: themeConfigService,
 		assetManager:       NewAssetManager(appDir, themeConfigService),
+		logger:             slog.Default(),
 	}
 }
 
@@ -97,7 +102,7 @@ func (s *RendererService) SetTheme(themeName string) error {
 	}
 	s.renderer = renderer
 	s.currentTheme = themeName // 更新当前主题
-	_, _ = fmt.Fprintf(os.Stderr, "✅ 使用 %s 引擎渲染主题: %s\n", renderer.GetEngineType(), themeName)
+	s.logger.Info(fmt.Sprintf("✅ 使用 %s 引擎渲染主题: %s", renderer.GetEngineType(), themeName))
 	return nil
 }
 
@@ -130,13 +135,13 @@ func (s *RendererService) RenderAll(ctx context.Context) error {
 	// 1. 复制主题资源
 	if err := s.assetManager.CopyThemeAssets(buildDir, themeConfig.ThemeName); err != nil {
 		errs = errors.Join(errs, fmt.Errorf("复制主题资源失败: %w", err))
-		_, _ = fmt.Fprintf(os.Stderr, "警告：复制主题资源失败: %v\n", err)
+		s.logger.Error(fmt.Sprintf("警告：复制主题资源失败: %v", err))
 	}
 
 	// 2. 复制站点静态资源（images、media 等）
 	if err := s.assetManager.CopySiteAssets(buildDir); err != nil {
 		errs = errors.Join(errs, fmt.Errorf("复制站点资源失败: %w", err))
-		_, _ = fmt.Fprintf(os.Stderr, "警告：复制站点资源失败: %v\n", err)
+		s.logger.Error(fmt.Sprintf("警告：复制站点资源失败: %v", err))
 	}
 
 	// 3. 构建模板数据
@@ -145,107 +150,92 @@ func (s *RendererService) RenderAll(ctx context.Context) error {
 		return fmt.Errorf("构建模板数据失败: %w", err)
 	}
 
-	// 4. 渲染首页
-	if err := s.renderIndex(ctx, buildDir, templateData); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("渲染首页失败: %w", err))
+	type renderTask struct {
+		name string
+		fn   func() error
 	}
 
-	// 5. 渲染文章详情页 (Parallel)
-	var wg sync.WaitGroup
-	var errMutex sync.Mutex
-	// Limit concurrency to avoid resource exhaustion
-	concurrency := runtime.NumCPU() // Use NumCPU for consistency
-	sem := make(chan struct{}, concurrency)
+	// 核心业务：列表类页面渲染（有顺序或依赖关系的情况，或保持简单串行）
+	tasks := []renderTask{
+		{"首页", func() error { return s.renderIndex(ctx, buildDir, templateData) }},
+		{"博客列表页", func() error { return s.renderBlog(ctx, buildDir, templateData) }},
+		{"标签页", func() error { return s.renderTags(ctx, buildDir, templateData, themeConfig) }},
+		{"归档页", func() error { return s.renderArchives(ctx, buildDir, templateData) }},
+		{"标签文章页", func() error { return s.renderTagPages(ctx, buildDir, templateData, themeConfig) }},
+	}
+
+	for _, task := range tasks {
+		if err := task.fn(); err != nil {
+			errs = errors.Join(errs, fmt.Errorf("%s失败: %w", task.name, err))
+			s.logger.Error(fmt.Sprintf("警告：%s失败: %v", task.name, err))
+		}
+	}
+
+	// 渲染文章详情页 (并发)
+	g, _ := errgroup.WithContext(ctx)
+	g.SetLimit(runtime.NumCPU()) // 限制并发数
 
 	for _, post := range posts {
 		if !post.Published {
 			continue
 		}
-
-		wg.Add(1)
-		go func(p domain.Post) {
-			defer wg.Done()
-			sem <- struct{}{}        // Acquire semaphore
-			defer func() { <-sem }() // Release semaphore
-
+		p := post
+		g.Go(func() error {
 			if err := s.renderPost(buildDir, p, templateData); err != nil {
-				// Thread-safe error collection
-				errMutex.Lock()
-				errs = errors.Join(errs, fmt.Errorf("rendering post %s: %w", p.Title, err))
-				errMutex.Unlock()
-				_, _ = fmt.Fprintf(os.Stderr, "Error rendering post %s: %v\n", p.Title, err)
+				s.logger.Error(fmt.Sprintf("rendering post %s: %v", p.Title, err))
+				return fmt.Errorf("rendering post %s: %w", p.Title, err)
 			}
-		}(post)
+			return nil
+		})
 	}
-	wg.Wait()
-
-	// 6. 渲染博客列表页
-	if err := s.renderBlog(ctx, buildDir, templateData); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("渲染博客列表页失败: %w", err))
-		_, _ = fmt.Fprintf(os.Stderr, "警告：渲染博客列表页失败: %v\n", err)
+	if err := g.Wait(); err != nil {
+		errs = errors.Join(errs, err)
 	}
 
-	// 7. 渲染标签列表页
-	if err := s.renderTags(ctx, buildDir, templateData, themeConfig); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("渲染标签页失败: %w", err))
-		_, _ = fmt.Fprintf(os.Stderr, "警告：渲染标签页失败: %v\n", err)
+	// 完全独立、无依赖的页面与元数据生成，运用 errgroup 并发执行
+	asyncTasks := []renderTask{
+		{"友链页", func() error { return s.renderFriends(ctx, buildDir, templateData) }},
+		{"闪念页", func() error { return s.renderMemos(ctx, buildDir, templateData) }},
+		{"404页面", func() error { return s.render404(buildDir, templateData) }},
+		{"搜索数据(search.json)", func() error { return s.renderSearchJSON(buildDir, templateData) }},
+		{"RSS订阅(feed.xml)", func() error { return s.renderRSS(buildDir, templateData) }},
+		{"站点地图(sitemap.xml)", func() error { return s.renderSitemap(buildDir, templateData) }},
+		{"Robots(robots.txt)", func() error { return s.renderRobotsTxt(buildDir, templateData) }},
 	}
 
-	// 8. 渲染每个标签的文章列表页
-	if err := s.renderTagPages(ctx, buildDir, templateData, themeConfig); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("渲染标签文章页失败: %w", err))
-		_, _ = fmt.Fprintf(os.Stderr, "警告：渲染标签文章页失败: %v\n", err)
+	asyncGroup, asyncCtx := errgroup.WithContext(ctx)
+	// 可以设置合理的并发数，或者不设置
+	asyncGroup.SetLimit(10)
+
+	var asyncErrs error
+	var errsMu sync.Mutex
+
+	for _, task := range asyncTasks {
+		t := task
+		asyncGroup.Go(func() error {
+			select {
+			case <-asyncCtx.Done():
+				return asyncCtx.Err()
+			default:
+			}
+			if err := t.fn(); err != nil {
+				s.logger.Error(fmt.Sprintf("警告：%s并发生成失败: %v", t.name, err))
+				errsMu.Lock()
+				asyncErrs = errors.Join(asyncErrs, fmt.Errorf("%s失败: %w", t.name, err))
+				errsMu.Unlock()
+			}
+			return nil
+		})
 	}
 
-	// 9. 渲染归档页
-	if err := s.renderArchives(ctx, buildDir, templateData); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("渲染归档页失败: %w", err))
-		_, _ = fmt.Fprintf(os.Stderr, "警告：渲染归档页失败: %v\n", err)
+	if err := asyncGroup.Wait(); err != nil {
+		errs = errors.Join(errs, err)
 	}
-
-	// 10. 渲染友链页
-	if err := s.renderFriends(ctx, buildDir, templateData); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("渲染友链页失败: %w", err))
-		_, _ = fmt.Fprintf(os.Stderr, "警告：渲染友链页失败: %v\n", err)
-	}
-
-	// 11. 渲染闪念页
-	if err := s.renderMemos(ctx, buildDir, templateData); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("渲染闪念页失败: %w", err))
-		_, _ = fmt.Fprintf(os.Stderr, "警告：渲染闪念页失败: %v\n", err)
-	}
-
-	// 12. 渲染 404 页
-	if err := s.render404(buildDir, templateData); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("渲染 404 页面失败: %w", err))
-		_, _ = fmt.Fprintf(os.Stderr, "警告：渲染 404 页面失败: %v\n", err)
-	}
-
-	// 13. 生成搜索数据 (api/search.json)
-	if err := s.renderSearchJSON(buildDir, templateData); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("生成搜索数据失败: %w", err))
-		_, _ = fmt.Fprintf(os.Stderr, "警告：生成搜索数据失败: %v\n", err)
-	}
-
-	// 14. 生成 RSS 订阅 (feed.xml)
-	if err := s.renderRSS(buildDir, templateData); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("生成 RSS 失败: %w", err))
-		_, _ = fmt.Fprintf(os.Stderr, "警告：生成 RSS 失败: %v\n", err)
-	}
-
-	// 15. 生成 Sitemap (sitemap.xml)
-	if err := s.renderSitemap(buildDir, templateData); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("生成 Sitemap 失败: %w", err))
-		_, _ = fmt.Fprintf(os.Stderr, "警告：生成 Sitemap 失败: %v\n", err)
-	}
-
-	// 16. 生成 Robots.txt
-	if err := s.renderRobotsTxt(buildDir, templateData); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("生成 robots.txt 失败: %w", err))
-		_, _ = fmt.Fprintf(os.Stderr, "警告：生成 robots.txt 失败: %v\n", err)
+	if asyncErrs != nil {
+		errs = errors.Join(errs, asyncErrs)
 	}
 
 	totalDuration := time.Since(startTime)
-	_, _ = fmt.Fprintf(os.Stderr, "渲染完成，共 %d 篇文章，耗时: %v\n", len(posts), totalDuration)
+	s.logger.Info(fmt.Sprintf("渲染完成，共 %d 篇文章，耗时: %v", len(posts), totalDuration))
 	return errs
 }
