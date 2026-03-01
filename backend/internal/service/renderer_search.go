@@ -1,13 +1,15 @@
 package service
 
 import (
-"encoding/json"
-"fmt"
-"os"
-"path/filepath"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
-"github.com/microcosm-cc/bluemonday"
-"gridea-pro/backend/internal/template"
+	"golang.org/x/net/html"
+
+	"gridea-pro/backend/internal/template"
 )
 
 // ─── 搜索数据 JSON ────────────────────────────────────────────────────────────
@@ -27,11 +29,11 @@ func (s *RendererService) renderSearchJSON(buildDir string, data *template.Templ
 			plainContent = string([]rune(plainContent)[:5000])
 		}
 		entries = append(entries, searchEntry{
-Title:   post.Title,
-Link:    post.Link,
-Date:    post.DateFormat,
-Content: plainContent,
-})
+			Title:   post.Title,
+			Link:    post.Link,
+			Date:    post.DateFormat,
+			Content: plainContent,
+		})
 	}
 
 	jsonData, err := json.Marshal(entries)
@@ -50,6 +52,26 @@ Content: plainContent,
 
 // stripHTMLForSearch 移除 HTML 标签，返回纯文本（用于搜索索引）。
 func stripHTMLForSearch(s string) string {
-	p := bluemonday.StrictPolicy()
-	return p.Sanitize(s)
+	doc, err := html.Parse(strings.NewReader(s))
+	if err != nil {
+		return s
+	}
+
+	var buf strings.Builder
+	var extractText func(*html.Node)
+	extractText = func(n *html.Node) {
+		if n.Type == html.TextNode {
+			buf.WriteString(n.Data)
+			buf.WriteByte(' ')
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.ElementNode && (c.Data == "script" || c.Data == "style") {
+				continue
+			}
+			extractText(c)
+		}
+	}
+	extractText(doc)
+
+	return strings.Join(strings.Fields(buf.String()), " ")
 }
