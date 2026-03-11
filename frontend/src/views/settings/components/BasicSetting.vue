@@ -241,7 +241,7 @@ import { useSiteStore } from '@/stores/site'
 import { toast } from '@/helpers/toast'
 import FooterBox from '@/components/FooterBox/index.vue'
 import ga from '@/helpers/analytics'
-import { ISetting } from '@/interfaces/setting'
+import type { ISettingForm } from '@/interfaces/setting'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -271,7 +271,7 @@ const platformFields: Record<string, string[]> = {
 // 平台配置缓存
 const platformConfigs = ref<Record<string, Record<string, any>>>({})
 
-const form = reactive<ISetting>({
+const form = reactive<ISettingForm>({
   platform: 'github',
   domain: '',
   repository: '',
@@ -406,18 +406,7 @@ onMounted(() => {
     platformConfigs.value = JSON.parse(JSON.stringify(setting.platformConfigs))
   }
 
-  // 3. 兼容旧数据迁移：如果 platformConfigs 中没有当前平台的配置，
-  //    从扁平字段提取当前平台的专属字段存入 platformConfigs
-  if (!platformConfigs.value[form.platform]) {
-    const fields = platformFields[form.platform] || []
-    const config: Record<string, any> = {}
-    for (const field of fields) {
-      config[field] = setting[field] || ''
-    }
-    platformConfigs.value[form.platform] = config
-  }
-
-  // 4. 从 platformConfigs 恢复当前平台的专属字段到表单（包括 domain）
+  // 3. 从 platformConfigs 恢复当前平台的专属字段到表单（包括 domain）
   restorePlatformConfig(form.platform)
 
   // 5. 处理 domain 协议分离（restorePlatformConfig 恢复的是含协议的完整 domain）

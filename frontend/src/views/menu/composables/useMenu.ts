@@ -46,8 +46,8 @@ export function useMenu() {
     }
 
     const menuLinks = computed(() => {
-        const { setting, themeConfig } = siteStore.site
-        const domain = setting.domain || ''
+        const { themeConfig } = siteStore.site
+        const domain = siteStore.currentDomain || ''
         const posts = siteStore.posts.map((item: IPost) => {
             return {
                 text: `📄 ${item.title}`,
@@ -82,7 +82,7 @@ export function useMenu() {
         form.link = ''
         visible.value = true
 
-        ga('Menu', 'Menu - new', siteStore.site.setting.domain)
+        ga('Menu', 'Menu - new', siteStore.currentDomain)
     }
 
     const closeSheet = () => {

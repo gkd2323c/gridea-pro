@@ -316,7 +316,7 @@ const postsWithLink = computed(() => {
     return {
       ...post,
       link: urlJoin(
-        siteStore.site.setting?.domain || '',
+        siteStore.currentDomain || '',
         siteStore.site.themeConfig?.postPath || '',
         post.fileName || '',
         '/'

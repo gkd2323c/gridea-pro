@@ -81,21 +81,7 @@ const defaultThemeConfig: ITheme = {
 // 默认设置
 const defaultSetting: ISetting = {
   platform: 'github',
-  domain: '',
-  repository: '',
-  branch: '',
-  username: '',
-  email: '',
-  tokenUsername: '',
-  token: '',
-  cname: '',
-  port: '22',
-  server: '',
-  password: '',
-  privateKey: '',
-  remotePath: '',
-  netlifySiteId: '',
-  netlifyAccessToken: '',
+  platformConfigs: {},
 }
 
 // 默认评论设置
@@ -136,6 +122,15 @@ export const useSiteStore = defineStore('site', () => {
   const commentSetting = ref<ICommentSetting>({ ...defaultCommentSetting })
 
   // Getters
+  /** 获取当前平台的指定配置项 */
+  const getPlatformConfig = (key: string): string => {
+    const platform = setting.value.platform
+    return (setting.value.platformConfigs?.[platform]?.[key] as string) || ''
+  }
+
+  /** 当前平台的 domain */
+  const currentDomain = computed(() => getPlatformConfig('domain'))
+
   const site = computed(() => ({
     appDir: appDir.value,
     config: config.value,
@@ -276,6 +271,8 @@ export const useSiteStore = defineStore('site', () => {
     commentSetting,
     // Getters
     site,
+    currentDomain,
+    getPlatformConfig,
     // Actions
     updateSite,
     resetSite,

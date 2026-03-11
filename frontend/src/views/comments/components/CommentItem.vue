@@ -178,7 +178,7 @@ const openLink = (e: Event, url?: string) => {
 
     let targetUrl = url
     if (targetUrl.startsWith('/')) {
-        const domain = siteStore.setting.domain || siteStore.setting.cname || ''
+        const domain = siteStore.currentDomain || siteStore.getPlatformConfig('cname') || ''
         if (domain) {
             const baseUrl = domain.startsWith('http') ? domain : `https://${domain}`
             targetUrl = `${baseUrl.replace(/\/$/, '')}${targetUrl}`

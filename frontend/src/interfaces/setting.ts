@@ -1,5 +1,15 @@
+/** 部署平台类型 */
+export type PlatformType = 'github' | 'coding' | 'sftp' | 'gitee' | 'netlify' | 'vercel'
+
+/** 系统设置 — 与后端 domain.Setting 一一对应 */
 export interface ISetting {
-  platform: 'github' | 'coding' | 'sftp' | 'gitee' | 'netlify' | 'vercel'
+  platform: PlatformType
+  platformConfigs: Record<string, Record<string, any>>
+}
+
+/** 设置表单（BasicSetting 内部使用的 UI 层平铺结构） */
+export interface ISettingForm {
+  platform: PlatformType
   domain: string
   repository: string
   branch: string
@@ -15,7 +25,6 @@ export interface ISetting {
   remotePath: string
   netlifyAccessToken: string
   netlifySiteId: string
-  platformConfigs?: Record<string, Record<string, any>>
   [index: string]: any
 }
 
@@ -26,5 +35,3 @@ export interface ICommentSetting {
   disqusSetting?: any
   [key: string]: any
 }
-
-

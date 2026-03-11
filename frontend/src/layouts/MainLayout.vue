@@ -82,7 +82,7 @@ class="opacity-75" fill="currentColor"
 class="flex items-center justify-center gap-6 text-muted-foreground w-[80%] relative"
           :class="{ 'after:content-[\'\'] after:block after:w-1.5 after:h-1.5 after:bg-[#fa5c5c] after:rounded-full after:absolute after:top-0 after:right-5': hasUpdate }">
           <GlobeAltIcon
-v-if="siteStore?.setting?.domain" class="size-4 cursor-pointer hover:text-primary transition-colors duration-300"
+v-if="siteStore.currentDomain" class="size-4 cursor-pointer hover:text-primary transition-colors duration-300"
             @click="goWeb" />
 
           <CogIcon
@@ -299,8 +299,9 @@ const publish = async () => {
 }
 
 const goWeb = () => {
-  if (siteStore?.setting?.domain) {
-    openInBrowser(siteStore.setting.domain)
+  const domain = siteStore.currentDomain
+  if (domain) {
+    openInBrowser(domain)
   }
 }
 

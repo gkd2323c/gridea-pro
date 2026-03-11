@@ -92,8 +92,11 @@ func (r *postRepository) scanPosts() error {
 		allPosts = append(allPosts, post)
 	}
 
-	// Sort by CreatedAt desc
+	// Sort: 置顶优先，再按 CreatedAt 降序
 	sort.Slice(allPosts, func(i, j int) bool {
+		if allPosts[i].IsTop != allPosts[j].IsTop {
+			return allPosts[i].IsTop
+		}
 		return allPosts[i].CreatedAt.After(allPosts[j].CreatedAt)
 	})
 
@@ -245,8 +248,11 @@ func (r *postRepository) save(ctx context.Context, post *domain.Post, isUpdate b
 
 	newCache = append(newCache, *post)
 
-	// Sort
+	// Sort: 置顶优先，再按 CreatedAt 降序
 	sort.Slice(newCache, func(i, j int) bool {
+		if newCache[i].IsTop != newCache[j].IsTop {
+			return newCache[i].IsTop
+		}
 		return newCache[i].CreatedAt.After(newCache[j].CreatedAt)
 	})
 
