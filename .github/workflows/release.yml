@@ -8,8 +8,10 @@
 # 构建产物（统一命名：Gridea.Pro_{version}_{os}_{arch}.{ext}）：
 #   macOS   → Gridea.Pro_v1.0.0_macos_arm64.dmg   (Apple Silicon)
 #             Gridea.Pro_v1.0.0_macos_amd64.dmg   (Intel)
-#   Windows → Gridea.Pro_v1.0.0_windows_amd64.exe
-#             Gridea.Pro_v1.0.0_windows_arm64.exe
+#   Windows → Gridea.Pro_v1.0.0_windows_amd64.exe          (便携版)
+#             Gridea.Pro_v1.0.0_windows_amd64_setup.exe    (安装版)
+#             Gridea.Pro_v1.0.0_windows_arm64.exe          (便携版)
+#             Gridea.Pro_v1.0.0_windows_arm64_setup.exe    (安装版)
 #   Linux   → Gridea.Pro_v1.0.0_linux_amd64.deb
 #             Gridea.Pro_v1.0.0_linux_amd64.rpm
 #             Gridea.Pro_v1.0.0_linux_amd64.AppImage
@@ -111,14 +113,18 @@ jobs:
           if-no-files-found: error
 
   # ===========================================================================
-  # Windows — amd64 + arm64 便携版 exe
+  # Windows — amd64 + arm64（便携版 exe + Inno Setup 安装包）
   # ===========================================================================
   build-windows:
     needs: prepare
     runs-on: windows-latest
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            inno_arch: x64compatible
+          - arch: arm64
+            inno_arch: arm64
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
     steps:
@@ -137,6 +143,9 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
       - name: Build Windows ${{ matrix.arch }}
         run: wails build -platform windows/${{ matrix.arch }} -clean -trimpath
 
@@ -144,19 +153,78 @@ jobs:
         shell: bash
         run: ls -la build/bin/
 
-      - name: Rename artifact
+      - name: Rename portable exe
         shell: pwsh
         run: |
           $exe = Get-ChildItem "build\bin\${{ env.BIN_NAME }}.exe" -ErrorAction SilentlyContinue
           if ($exe) {
-            $newName = "${{ env.RELEASE_PREFIX }}_${{ env.VERSION }}_windows_${{ matrix.arch }}.exe"
-            Move-Item $exe.FullName "build\bin\$newName"
+            Copy-Item $exe.FullName "build\bin\${{ env.RELEASE_PREFIX }}_${{ env.VERSION }}_windows_${{ matrix.arch }}.exe"
           }
+
+      - name: Create Inno Setup installer
+        shell: pwsh
+        run: |
+          $version = "${{ env.VERSION }}".TrimStart("v")
+          $arch = "${{ matrix.arch }}"
+          $innoArch = "${{ matrix.inno_arch }}"
+          $outputName = "${{ env.RELEASE_PREFIX }}_${{ env.VERSION }}_windows_${arch}_setup"
+
+          # 生成 .iss 脚本
+          $iss = @"
+          [Setup]
+          AppName=${{ env.APP_NAME }}
+          AppVersion=${version}
+          AppPublisher=Gridea Pro Contributors
+          AppPublisherURL=https://gridea.pro
+          AppSupportURL=https://github.com/Gridea-Pro/gridea-pro/issues
+          DefaultDirName={autopf}\${{ env.APP_NAME }}
+          DefaultGroupName=${{ env.APP_NAME }}
+          OutputDir=build\bin
+          OutputBaseFilename=${outputName}
+          Compression=lzma2
+          SolidCompression=yes
+          ArchitecturesAllowed=${innoArch}
+          ArchitecturesInstallIn64BitMode=${innoArch}
+          UninstallDisplayIcon={app}\${{ env.BIN_NAME }}.exe
+          SetupIconFile=build\appicon.ico
+          WizardStyle=modern
+          PrivilegesRequired=lowest
+          PrivilegesRequiredOverridesAllowed=dialog
+
+          [Languages]
+          Name: "english"; MessagesFile: "compiler:Default.isl"
+          Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+
+          [Files]
+          Source: "build\bin\${{ env.BIN_NAME }}.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+          [Icons]
+          Name: "{group}\${{ env.APP_NAME }}"; Filename: "{app}\${{ env.BIN_NAME }}.exe"
+          Name: "{autodesktop}\${{ env.APP_NAME }}"; Filename: "{app}\${{ env.BIN_NAME }}.exe"; Tasks: desktopicon
+
+          [Tasks]
+          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
+          [Run]
+          Filename: "{app}\${{ env.BIN_NAME }}.exe"; Description: "{cm:LaunchProgram,${{ env.APP_NAME }}}"; Flags: nowait postinstall skipifsilent
+          "@
+
+          $iss | Out-File -FilePath "installer.iss" -Encoding UTF8
+
+          # 如果没有 .ico 文件，从 .png 生成一个（Inno Setup 需要 .ico）
+          if (-Not (Test-Path "build\appicon.ico")) {
+            # 使用 magick 转换（GitHub runner 预装了 ImageMagick）
+            magick "build\appicon.png" -define icon:auto-resize=256,128,64,48,32,16 "build\appicon.ico"
+          }
+
+          # 编译安装包
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer.iss"
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-build-${{ matrix.arch }}
-          path: build/bin/*.exe
+          path: |
+            build/bin/${{ env.RELEASE_PREFIX }}_*.exe
           if-no-files-found: error
 
   # ===========================================================================
