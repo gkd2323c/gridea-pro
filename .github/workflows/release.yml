@@ -1,17 +1,17 @@
 # =============================================================================
 # Gridea Pro — Cross-Platform Release Build
 # =============================================================================
-# 触发方式：推送 v 开头的 tag（如 v0.1.0、v1.0.0-beta.1）
+# 触发方式：推送 v 开头的 tag（如 v1.0.0、v1.1.0-beta.1）
 # 构建产物：
 #   macOS   → .dmg (Universal: Intel + Apple Silicon)
 #   Windows → NSIS 安装包 (.exe installer)
 #   Linux   → .deb 包 + .AppImage
 #
 # 用法：
-#   git tag v0.1.0
-#   git push origin v0.1.0
+#   git tag -a v1.0.0 -m "Gridea Pro v1.0.0 — 你的发布说明"
+#   git push origin v1.0.0
 #
-# 构建完成后自动创建 GitHub Release 并上传所有安装包。
+# 构建完成后自动创建 GitHub Release（草稿）并上传所有安装包。
 # =============================================================================
 
 name: Release
@@ -25,13 +25,14 @@ on:
 # 防止前端构建 OOM
 env:
   NODE_OPTIONS: "--max-old-space-size=4096"
-  # ⬇️ 改成你项目 wails.json 里的 "name" 值
   APP_NAME: "Gridea Pro"
-  # ⬇️ 改成 wails build 后在 build/bin/ 下生成的二进制文件名（不含扩展名）
+  # Wails build 后在 build/bin/ 下生成的二进制文件名（不含扩展名）
   BIN_NAME: "Gridea Pro"
+  # Linux 文件系统友好的名称（不含空格，用于 deb 包名、路径等）
+  BIN_SLUG: "gridea-pro"
 
 permissions:
-  contents: write  # 需要写权限来创建 Release
+  contents: write
 
 jobs:
   # ===========================================================================
@@ -48,7 +49,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.5"
+          go-version-file: "go.mod"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -67,20 +68,17 @@ jobs:
 
       - name: Create DMG
         run: |
-          # 使用 macOS 原生 hdiutil 创建 DMG
-          # 如果你想要更精美的 DMG（带背景图、图标布局），可以改用 create-dmg
           cd build/bin
           hdiutil create -volname "${{ env.APP_NAME }}" \
             -srcfolder "${{ env.BIN_NAME }}.app" \
             -ov -format UDZO \
-            "${{ env.BIN_NAME }}_macos_universal_${{ steps.version.outputs.VERSION }}.dmg"
+            "${{ env.BIN_SLUG }}_macos_universal_${{ steps.version.outputs.VERSION }}.dmg"
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-build
-          path: |
-            build/bin/*.dmg
+          path: build/bin/*.dmg
           if-no-files-found: error
 
   # ===========================================================================
@@ -97,7 +95,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.5"
+          go-version-file: "go.mod"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -123,18 +121,19 @@ jobs:
         run: |
           $version = "${{ steps.version.outputs.VERSION }}"
           $binDir = "build/bin"
+          $slug = "${{ env.BIN_SLUG }}"
 
-          # 重命名 NSIS 安装包（Wails 生成的安装包名通常是 {AppName}-amd64-installer.exe）
+          # 重命名 NSIS 安装包
           $installer = Get-ChildItem "$binDir/*installer*" -ErrorAction SilentlyContinue
           if ($installer) {
-            $newName = "${{ env.BIN_NAME }}_windows_amd64_${version}_setup.exe"
+            $newName = "${slug}_windows_amd64_${version}_setup.exe"
             Move-Item $installer.FullName "$binDir/$newName"
           }
 
           # 重命名原始 exe
           $exe = Get-ChildItem "$binDir/${{ env.BIN_NAME }}.exe" -ErrorAction SilentlyContinue
           if ($exe) {
-            $newName = "${{ env.BIN_NAME }}_windows_amd64_${version}.exe"
+            $newName = "${slug}_windows_amd64_${version}.exe"
             Move-Item $exe.FullName "$binDir/$newName"
           }
 
@@ -142,15 +141,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: |
-            build/bin/*.exe
+          path: build/bin/*.exe
           if-no-files-found: error
 
   # ===========================================================================
   # Linux Build — .deb + AppImage
   # ===========================================================================
   build-linux:
-    runs-on: ubuntu-22.04  # 用 22.04 保证 WebKitGTK 4.0 兼容性
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -160,7 +158,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.5"
+          go-version-file: "go.mod"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -190,8 +188,8 @@ jobs:
       - name: Build .deb package
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
-          # 去掉 v 前缀用于 deb 版本号（deb 版本号不能以字母开头）
           DEB_VERSION="${VERSION#v}"
+          SLUG="${{ env.BIN_SLUG }}"
           PKG_DIR="deb-pkg"
 
           mkdir -p ${PKG_DIR}/DEBIAN
@@ -199,16 +197,13 @@ jobs:
           mkdir -p ${PKG_DIR}/usr/share/applications
           mkdir -p ${PKG_DIR}/usr/share/icons/hicolor/256x256/apps
 
-          # 复制二进制
-          cp build/bin/${{ env.BIN_NAME }} ${PKG_DIR}/usr/bin/${{ env.BIN_NAME }}
-          chmod 755 ${PKG_DIR}/usr/bin/${{ env.BIN_NAME }}
+          cp "build/bin/${{ env.BIN_NAME }}" "${PKG_DIR}/usr/bin/${SLUG}"
+          chmod 755 "${PKG_DIR}/usr/bin/${SLUG}"
+          cp build/appicon.png "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps/${SLUG}.png"
 
-          # 复制图标
-          cp build/appicon.png ${PKG_DIR}/usr/share/icons/hicolor/256x256/apps/${{ env.BIN_NAME }}.png
-
-          # 创建 control 文件
+          # control 文件 — 行首不能有空格
           cat > ${PKG_DIR}/DEBIAN/control << EOF
-          Package: ${{ env.BIN_NAME }}
+          Package: ${SLUG}
           Version: ${DEB_VERSION}
           Section: editors
           Priority: optional
@@ -222,67 +217,63 @@ jobs:
            to Gridea, rebuilt from the ground up.
           EOF
 
-          # 创建 .desktop 文件
-          cat > ${PKG_DIR}/usr/share/applications/${{ env.BIN_NAME }}.desktop << EOF
+          # .desktop 文件
+          cat > ${PKG_DIR}/usr/share/applications/${SLUG}.desktop << EOF
           [Desktop Entry]
           Name=${{ env.APP_NAME }}
           Comment=A modern static blog client
-          Exec=${{ env.BIN_NAME }}
-          Icon=${{ env.BIN_NAME }}
+          Exec=${SLUG}
+          Icon=${SLUG}
           Type=Application
           Categories=Development;TextEditor;
           Keywords=blog;markdown;static;
           EOF
 
-          # 构建 deb
           dpkg-deb --build ${PKG_DIR} \
-            build/bin/${{ env.BIN_NAME }}_linux_amd64_${VERSION}.deb
+            "build/bin/${SLUG}_linux_amd64_${VERSION}.deb"
 
       # ----- AppImage -----
       - name: Build AppImage
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
+          SLUG="${{ env.BIN_SLUG }}"
 
-          # 创建 AppDir 结构
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
 
-          cp build/bin/${{ env.BIN_NAME }} AppDir/usr/bin/${{ env.BIN_NAME }}
-          chmod 755 AppDir/usr/bin/${{ env.BIN_NAME }}
-          cp build/appicon.png AppDir/${{ env.BIN_NAME }}.png
-          cp build/appicon.png AppDir/usr/share/icons/hicolor/256x256/apps/${{ env.BIN_NAME }}.png
+          cp "build/bin/${{ env.BIN_NAME }}" "AppDir/usr/bin/${SLUG}"
+          chmod 755 "AppDir/usr/bin/${SLUG}"
+          cp build/appicon.png "AppDir/${SLUG}.png"
+          cp build/appicon.png "AppDir/usr/share/icons/hicolor/256x256/apps/${SLUG}.png"
 
-          # .desktop 文件（AppImage 要求放在 AppDir 根目录）
-          cat > AppDir/${{ env.BIN_NAME }}.desktop << EOF
+          cat > "AppDir/${SLUG}.desktop" << EOF
           [Desktop Entry]
           Name=${{ env.APP_NAME }}
           Comment=A modern static blog client
-          Exec=${{ env.BIN_NAME }}
-          Icon=${{ env.BIN_NAME }}
+          Exec=${SLUG}
+          Icon=${SLUG}
           Type=Application
           Categories=Development;TextEditor;
           EOF
-          cp AppDir/${{ env.BIN_NAME }}.desktop AppDir/usr/share/applications/
+          cp "AppDir/${SLUG}.desktop" AppDir/usr/share/applications/
 
           # AppRun 入口脚本
-          cat > AppDir/AppRun << 'APPRUN'
+          cat > AppDir/AppRun << EOF
           #!/bin/bash
-          SELF=$(readlink -f "$0")
-          HERE=${SELF%/*}
-          export PATH="${HERE}/usr/bin:${PATH}"
-          exec "${HERE}/usr/bin/PLACEHOLDER_BIN" "$@"
-          APPRUN
-          sed -i "s/PLACEHOLDER_BIN/${{ env.BIN_NAME }}/" AppDir/AppRun
+          SELF=\$(readlink -f "\$0")
+          HERE=\${SELF%/*}
+          export PATH="\${HERE}/usr/bin:\${PATH}"
+          exec "\${HERE}/usr/bin/${SLUG}" "\$@"
+          EOF
           chmod +x AppDir/AppRun
 
           # 下载 appimagetool
           wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
           chmod +x appimagetool-x86_64.AppImage
 
-          # 构建 AppImage
           ARCH=x86_64 ./appimagetool-x86_64.AppImage AppDir \
-            "build/bin/${{ env.BIN_NAME }}_linux_amd64_${VERSION}.AppImage"
+            "build/bin/${SLUG}_linux_amd64_${VERSION}.AppImage"
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
@@ -315,9 +306,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: Gridea Pro ${{ github.ref_name }}
           files: artifacts/*
           generate_release_notes: true
-          draft: true  # 先创建草稿，你审查后再手动发布
+          draft: true
           prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') || contains(github.ref, 'rc') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
