@@ -1,6 +1,9 @@
-# Gridea Pro - Wails 版本
+# Gridea Pro
 
 一个基于 Wails (Go + Vue 3) 的静态博客写作客户端。
+
+> 🚀 基于 [Gridea](https://github.com/getgridea/gridea) 重构的新一代静态博客写作客户端
+> 感谢 Gridea 原作者 [@EryouHao](https://github.com/EryouHao) 的开创性工作
 
 ## 🎉 特性
 
