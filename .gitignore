@@ -68,6 +68,7 @@ Gridea Pro-repomix-output.xml
 
 # Project-specific ignores
 files/
+docs/
 CLAUDE.md
 
 # OS generated files
