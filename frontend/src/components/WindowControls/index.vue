@@ -71,7 +71,7 @@ const close = () => Quit()
   right: 0;
   z-index: 9999;
   display: flex;
-  height: 32px;
+  height: 40px;
   -webkit-app-region: no-drag;
 }
 
@@ -80,7 +80,7 @@ const close = () => Quit()
   align-items: center;
   justify-content: center;
   width: 46px;
-  height: 32px;
+  height: 40px;
   border: none;
   background: transparent;
   color: var(--foreground, #333);
