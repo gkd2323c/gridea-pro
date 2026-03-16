@@ -14,11 +14,16 @@ body:
       label: 类别
       description: 这个功能属于哪个方面？
       options:
+        - 文章管理
         - 编辑器 / 写作体验
-        - 主题 / 外观
+        - 闪念管理
+        - 菜单管理
+        - 分类管理
+        - 标签管理
+        - 主题设置
         - 发布 / 部署
         - 媒体管理
-        - 设置 / 配置
+        - 系统设置
         - 性能优化
         - 平台支持
         - 其他
@@ -29,8 +34,8 @@ body:
     id: problem
     attributes:
       label: 问题或动机
-      description: "这个功能解决什么问题？是否和你遇到的某个痛点有关？"
-      placeholder: "我在使用时经常遇到……"
+      description: "这个功能解决什么问题？是否和你遇到的某个痛点有关？或者说你为什么你希望在 Gridea 中使用这个功能？"
+      placeholder: "我在使用时经常遇到……，我希望……"
     validations:
       required: true
 

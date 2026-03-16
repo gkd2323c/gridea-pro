@@ -14,12 +14,17 @@ body:
       label: Category
       description: What area does this feature relate to?
       options:
+        - Article Management
         - Editor / Writing Experience
-        - Theme / Appearance
+        - Memos Management
+        - Menus Management
+        - Category Management
+        - Tags Management
+        - Theme Configuration
         - Publishing / Deployment
         - Media Management
-        - Settings / Configuration
-        - Performance
+        - System Settings
+        - Performance Optimization
         - Platform Support
         - Other
     validations:
