@@ -8,9 +8,7 @@
 # 构建产物（统一命名：Gridea.Pro_{version}_{os}_{arch}.{ext}）：
 #   macOS   → Gridea.Pro_v1.0.0_macos_arm64.dmg   (Apple Silicon)
 #             Gridea.Pro_v1.0.0_macos_amd64.dmg   (Intel)
-#   Windows → Gridea.Pro_v1.0.0_windows_amd64.exe          (便携版)
-#             Gridea.Pro_v1.0.0_windows_amd64_setup.exe    (安装版)
-#             Gridea.Pro_v1.0.0_windows_arm64.exe          (便携版)
+#   Windows → Gridea.Pro_v1.0.0_windows_amd64_setup.exe    (安装版)
 #             Gridea.Pro_v1.0.0_windows_arm64_setup.exe    (安装版)
 #   Linux   → Gridea.Pro_v1.0.0_linux_amd64.deb    (Ubuntu 24.04+, webkit2gtk-4.1)
 #             Gridea.Pro_v1.0.0_linux_amd64.rpm    (Fedora 39+, webkit2gtk-4.1)
@@ -158,14 +156,6 @@ jobs:
         shell: bash
         run: ls -la build/bin/
 
-      - name: Rename portable exe
-        shell: pwsh
-        run: |
-          $exe = Get-ChildItem "build\bin\${{ env.BIN_NAME }}.exe" -ErrorAction SilentlyContinue
-          if ($exe) {
-            Copy-Item $exe.FullName "build\bin\${{ env.RELEASE_PREFIX }}_${{ env.VERSION }}_windows_${{ matrix.arch }}.exe"
-          }
-
       - name: Create Inno Setup installer
         shell: pwsh
         run: |
@@ -237,7 +227,7 @@ jobs:
         with:
           name: windows-build-${{ matrix.arch }}
           path: |
-            build/bin/${{ env.RELEASE_PREFIX }}_*.exe
+            build/bin/${{ env.RELEASE_PREFIX }}_*_setup.exe
           if-no-files-found: error
 
   # ===========================================================================
