@@ -1,14 +1,13 @@
 <template>
   <div class="flex h-screen w-full overflow-hidden bg-background text-foreground">
-    <!-- Window Controls (Windows/Linux only) -->
-    <WindowControls />
-
     <!-- Sidebar -->
     <aside
 v-if="sidebarVisible"
       class="w-[200px] flex-shrink-0 flex flex-col bg-sidebar border-r border-border z-10 select-none">
-      <!-- Draggable Area -->
-      <div class="h-10 w-full flex-shrink-0 header-spacer"></div>
+      <!-- Draggable Area + Window Controls (Windows/Linux: traffic lights) -->
+      <div class="h-10 w-full flex-shrink-0 header-spacer flex items-center">
+        <WindowControls />
+      </div>
 
       <div class="flex-1 flex flex-col overflow-hidden">
         <!-- Logo -->
@@ -450,31 +449,5 @@ onMounted(() => {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
-}
-</style>
-
-<!-- Windows/Linux Frameless: 为窗口控制按钮留出右侧空间 -->
-<style>
-.platform-frameless {
-  /* 所有页面 header（inline draggable） */
-  [style*="--wails-draggable: drag"] {
-    padding-right: 140px;
-  }
-
-  /* 编辑器 header（CSS draggable） */
-  .page-title {
-    padding-right: 140px;
-  }
-
-  /* 编辑器右侧固定工具栏 */
-  .right-tool-container,
-  .right-bottom-tool-container {
-    right: 140px;
-  }
-
-  /* Sheet/Drawer 关闭按钮避让 */
-  [data-radix-dialog-content] [data-radix-dialog-close] {
-    right: 140px;
-  }
 }
 </style>
