@@ -134,7 +134,7 @@ watch(locale, (val) => {
 })
 
 onMounted(() => {
-  currentFolderPath.value = siteStore.appDir
+  currentFolderPath.value = (siteStore.appDir || '').replace(/\\/g, '/')
   // Initialize from global state, which is already correctly set by locales/index.ts
   currentLanguage.value = locale.value as LocaleType
 })
