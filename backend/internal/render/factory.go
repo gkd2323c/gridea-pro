@@ -70,15 +70,20 @@ func (f *RendererFactory) readEngineFromConfig(configPath string) string {
 	}
 
 	var config struct {
-		Engine string `json:"engine"`
+		Engine         string `json:"engine"`
+		TemplateEngine string `json:"templateEngine"`
 	}
 
 	if err := json.Unmarshal(data, &config); err != nil {
 		return ""
 	}
 
-	// 标准化引擎名称
-	engine := strings.ToLower(strings.TrimSpace(config.Engine))
+	// 标准化引擎名称（优先使用 engine 字段，其次使用 templateEngine 字段）
+	raw := config.Engine
+	if raw == "" {
+		raw = config.TemplateEngine
+	}
+	engine := strings.ToLower(strings.TrimSpace(raw))
 	if engine == "go" || engine == "gotemplate" || engine == "gotemplates" {
 		return "gotemplate"
 	}

@@ -4,6 +4,8 @@ import {context} from '../models';
 
 export function GetPreviewURL():Promise<string>;
 
+export function GetVersion():Promise<string>;
+
 export function LoadSite():Promise<Record<string, any>>;
 
 export function OpenFolderDialog():Promise<Array<string>>;

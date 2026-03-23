@@ -9,7 +9,7 @@ node_modules
 # Build outputs
 /dist
 /dist-electron
-/build
+/build/bin/
 /out
 
 # Local env files

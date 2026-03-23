@@ -108,12 +108,19 @@ func (s *Engine) SetCdnSettingRepo(repo domain.CdnSettingRepository) {
 
 // SetTheme 设置主题并初始化渲染器
 func (s *Engine) SetTheme(themeName string) error {
-	// 缓存检查：如果渲染器已初始化且主题未变更，直接返回
-	if s.renderer != nil && s.currentTheme == themeName {
+	factory := render.NewRendererFactory(s.appDir, themeName)
+
+	// 检测当前主题的引擎类型
+	engineType, err := factory.GetEngineType()
+	if err != nil {
+		return fmt.Errorf("检测引擎类型失败: %w", err)
+	}
+
+	// 缓存检查：主题未变更 且 引擎类型一致时，直接返回
+	if s.renderer != nil && s.currentTheme == themeName && s.renderer.GetEngineType() == engineType {
 		return nil
 	}
 
-	factory := render.NewRendererFactory(s.appDir, themeName)
 	renderer, err := factory.CreateRenderer()
 	if err != nil {
 		return fmt.Errorf("创建渲染器失败: %w", err)

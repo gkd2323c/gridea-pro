@@ -6,6 +6,10 @@ export function GetPreviewURL() {
   return window['go']['app']['App']['GetPreviewURL']();
 }
 
+export function GetVersion() {
+  return window['go']['app']['App']['GetVersion']();
+}
+
 export function LoadSite() {
   return window['go']['app']['App']['LoadSite']();
 }

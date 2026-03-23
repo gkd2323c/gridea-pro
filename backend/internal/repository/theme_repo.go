@@ -13,6 +13,7 @@ type themeRepository struct {
 	appDir       string
 	configCache  *domain.ThemeConfig
 	configLoaded bool
+	configModTime int64
 }
 
 func NewThemeRepository(appDir string) domain.ThemeRepository {
@@ -20,13 +21,12 @@ func NewThemeRepository(appDir string) domain.ThemeRepository {
 		appDir:       appDir,
 		configCache:  nil,
 		configLoaded: false,
+		configModTime: 0,
 	}
 }
 
 func (r *themeRepository) GetAll(ctx context.Context) ([]domain.Theme, error) {
-	// Functionally identical to previous implementation (no caching for theme list yet)
-	// Could implement caching later if directory scanning becomes a bottleneck.
-
+// ... existing GetAll code ...
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -59,8 +59,14 @@ func (r *themeRepository) GetAll(ctx context.Context) ([]domain.Theme, error) {
 }
 
 func (r *themeRepository) loadConfigIfNeeded() error {
+	configPath := filepath.Join(r.appDir, "config", "config.json")
+	var currentModTime int64 = 0
+	if info, err := os.Stat(configPath); err == nil {
+		currentModTime = info.ModTime().UnixNano()
+	}
+
 	r.mu.RLock()
-	if r.configLoaded {
+	if r.configLoaded && r.configModTime == currentModTime && currentModTime != 0 {
 		r.mu.RUnlock()
 		return nil
 	}
@@ -69,11 +75,10 @@ func (r *themeRepository) loadConfigIfNeeded() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.configLoaded {
+	if r.configLoaded && r.configModTime == currentModTime && currentModTime != 0 {
 		return nil
 	}
 
-	configPath := filepath.Join(r.appDir, "config", "config.json")
 	var config domain.ThemeConfig
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -96,6 +101,7 @@ func (r *themeRepository) loadConfigIfNeeded() error {
 			LinkPath:         "link",
 		}
 		r.configLoaded = true
+		r.configModTime = currentModTime
 		return nil
 	}
 
@@ -105,6 +111,7 @@ func (r *themeRepository) loadConfigIfNeeded() error {
 
 	r.configCache = &config
 	r.configLoaded = true
+	r.configModTime = currentModTime
 	return nil
 }
 
