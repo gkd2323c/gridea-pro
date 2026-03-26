@@ -190,6 +190,16 @@ my-theme/
 - [ ] 多博客实例管理
 - [ ] 插件系统
 
+## 交流群
+
+扫描下方二维码加入微信交流群，反馈问题、交流使用心得：
+
+<p align="center">
+  <img src="images/wechatgroup.jpg" alt="微信交流群" width="300">
+</p>
+
+> 二维码会定期更新，如已过期请提交 Issue 获取最新二维码。
+
 ## 参与贡献
 
 欢迎提交 Issue 和 Pull Request。参与贡献前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
