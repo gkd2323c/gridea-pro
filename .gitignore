@@ -10,7 +10,13 @@ node_modules
 /dist
 /dist-electron
 /build/bin/
+/build/
+frontend/dist/
 /out
+
+# Backend build binaries
+backend/gridea-mcp
+backend/*.exe
 
 # Local env files
 .env
